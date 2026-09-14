@@ -1,12 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { allProductsQuery, type Product } from "@/lib/queries";
-import { claimAdmin } from "@/lib/admin.functions";
 import { formatPrice } from "@/lib/money";
+import { isAdminSession, clearAdminSession } from "@/lib/admin-auth";
+import {
+  getPlanConfig,
+  savePlanConfig,
+  resetPlanConfig,
+  type PricingConfig,
+} from "@/lib/pricing-config";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -48,25 +53,11 @@ const emptyDraft: Draft = {
 function AdminPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const claim = useServerFn(claimAdmin);
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(isAdminSession());
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      try {
-        const res = await claim({});
-        if (active) setIsAdmin(res.granted);
-      } catch {
-        if (active) setIsAdmin(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [claim]);
+  const [planConfig, setPlanConfig] = useState<PricingConfig>(getPlanConfig);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const products = useQuery({ ...allProductsQuery, enabled: isAdmin === true });
   const orders = useQuery({
@@ -91,7 +82,7 @@ function AdminPage() {
   async function signOut() {
     await qc.cancelQueries();
     qc.clear();
-    await supabase.auth.signOut();
+    clearAdminSession();
     void navigate({ to: "/auth", replace: true });
   }
 
@@ -137,6 +128,49 @@ function AdminPage() {
       toast.success("Product deleted.");
       refresh();
     }
+  }
+
+  function savePlan(updated: PricingConfig) {
+    setPlanConfig(updated);
+    savePlanConfig(updated);
+    toast.success("Plan pricing saved.");
+  }
+
+  function resetPlan() {
+    resetPlanConfig();
+    setPlanConfig(getPlanConfig());
+    toast.success("Plan pricing reset to defaults.");
+  }
+
+  function exportPlan() {
+    const blob = new Blob([JSON.stringify(getPlanConfig(), null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "pricing-config.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importPlan(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result)) as PricingConfig;
+        if (!parsed.terminals || !parsed.locations || !parsed.support) {
+          throw new Error("Invalid config file.");
+        }
+        savePlan(parsed);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Could not import config.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
   }
 
   if (isAdmin === null) {
@@ -265,6 +299,19 @@ function AdminPage() {
       </section>
 
       <section className="mt-12">
+        <h2 className="text-lg font-bold tracking-tight">Plan pricing</h2>
+        <PlanPricingSection
+          config={planConfig}
+          onSave={savePlan}
+          onReset={resetPlan}
+          onExport={exportPlan}
+          onImport={() => fileRef.current?.click()}
+          fileRef={fileRef}
+          onFileChange={importPlan}
+        />
+      </section>
+
+      <section className="mt-12">
         <h2 className="text-lg font-bold tracking-tight">Recent orders</h2>
         <div className={`${card} mt-4 overflow-x-auto`}>
           <table className="w-full text-left text-sm">
@@ -314,7 +361,11 @@ function ProductRow({
     <div className={`${card} grid gap-4 md:grid-cols-[2fr_1fr_auto] md:items-end`}>
       <div>
         <label className={label}>Name — {product.sku}</label>
-        <input className={`${input} mt-1.5`} value={name} onChange={(e) => setName(e.target.value)} />
+        <input
+          className={`${input} mt-1.5`}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
       </div>
       <div>
         <label className={label}>Price (USD)</label>
@@ -352,6 +403,135 @@ function ProductRow({
         >
           Delete
         </button>
+      </div>
+    </div>
+  );
+}
+
+function PlanPricingSection({
+  config,
+  onSave,
+  onReset,
+  onExport,
+  onImport,
+  fileRef,
+  onFileChange,
+}: {
+  config: PricingConfig;
+  onSave: (config: PricingConfig) => void;
+  onReset: () => void;
+  onExport: () => void;
+  onImport: () => void;
+  fileRef: React.RefObject<HTMLInputElement | null>;
+  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  const [draft, setDraft] = useState<PricingConfig>(config);
+
+  function updateOption(
+    group: "terminals" | "locations" | "support",
+    id: string,
+    field: "label" | "price_cents",
+    value: string | number,
+  ) {
+    setDraft((prev) => ({
+      ...prev,
+      [group]: prev[group].map((opt) => (opt.id === id ? { ...opt, [field]: value } : opt)),
+    }));
+  }
+
+  function optionRows(group: "terminals" | "locations" | "support") {
+    return draft[group].map((opt) => (
+      <div key={opt.id} className="grid gap-2 sm:grid-cols-[1fr_140px]">
+        <input
+          className={`${input} mt-0`}
+          value={opt.label}
+          onChange={(e) => updateOption(group, opt.id, "label", e.target.value)}
+        />
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] text-subtle">$</span>
+          <input
+            className={`${input} mt-0`}
+            inputMode="decimal"
+            value={(opt.price_cents / 100).toFixed(2)}
+            onChange={(e) =>
+              updateOption(group, opt.id, "price_cents", Math.round(Number(e.target.value) * 100))
+            }
+          />
+        </div>
+      </div>
+    ));
+  }
+
+  return (
+    <div className={`${card} mt-4`}>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/json"
+        className="hidden"
+        onChange={onFileChange}
+      />
+
+      <div className="grid gap-8 lg:grid-cols-3">
+        <div>
+          <h3 className="font-mono text-[11px] uppercase tracking-wider text-subtle">Terminals</h3>
+          <div className="mt-3 space-y-2">{optionRows("terminals")}</div>
+        </div>
+        <div>
+          <h3 className="font-mono text-[11px] uppercase tracking-wider text-subtle">Locations</h3>
+          <div className="mt-3 space-y-2">{optionRows("locations")}</div>
+        </div>
+        <div>
+          <h3 className="font-mono text-[11px] uppercase tracking-wider text-subtle">Support</h3>
+          <div className="mt-3 space-y-2">{optionRows("support")}</div>
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-end gap-6 border-t border-line pt-5">
+        <div>
+          <label className={label}>Bundle discount (%)</label>
+          <input
+            className={`${input} mt-1.5 w-28`}
+            inputMode="decimal"
+            value={draft.bundleDiscountPercent}
+            onChange={(e) =>
+              setDraft({
+                ...draft,
+                bundleDiscountPercent: Number(e.target.value),
+              })
+            }
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => onSave(draft)}
+            className="rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-foreground"
+          >
+            Save changes
+          </button>
+          <button
+            onClick={onExport}
+            className="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold"
+          >
+            Export config
+          </button>
+          <button
+            onClick={onImport}
+            className="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold"
+          >
+            Import config
+          </button>
+          <button
+            onClick={onReset}
+            className="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-brand"
+          >
+            Reset to defaults
+          </button>
+        </div>
+        <p className="w-full font-mono text-[10px] uppercase tracking-wider text-subtle">
+          Changes apply to the pricing page in this browser. Use Export/Import to move config across
+          devices.
+        </p>
       </div>
     </div>
   );

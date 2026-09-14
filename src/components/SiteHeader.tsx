@@ -6,7 +6,7 @@ const navLink = "text-subtle transition-colors hover:text-ink";
 
 export function SiteHeader() {
   const { count } = useCart();
-  const { session } = useSession();
+  const { isAdmin } = useSession();
 
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-paper/85 backdrop-blur">
@@ -21,10 +21,13 @@ export function SiteHeader() {
           <Link to="/catalog" className={navLink}>
             Catalog
           </Link>
+          <Link to="/pricing" className={navLink}>
+            Pricing
+          </Link>
           <Link to="/policy" className={navLink}>
             License policy
           </Link>
-          <Link to={session ? "/admin" : "/auth"} className={navLink}>
+          <Link to={isAdmin ? "/admin" : "/auth"} className={navLink}>
             Admin
           </Link>
         </nav>
