@@ -72,7 +72,7 @@ function CartPage() {
               {lines.map((l) => (
                 <li
                   key={l.slug}
-                  className="flex flex-col gap-4 rounded-[20px] border border-line bg-surface p-5 shadow-card sm:flex-row sm:items-center sm:justify-between"
+                  className="flex items-center justify-between gap-4 rounded-[20px] border border-line bg-surface p-5 shadow-card"
                 >
                   <div>
                     <p className="font-semibold">{l.name}</p>
@@ -80,7 +80,7 @@ function CartPage() {
                       {formatPrice(l.priceCents)} each
                     </p>
                   </div>
-                  <div className="flex items-center justify-between gap-3 sm:gap-4">
+                  <div className="flex items-center gap-4">
                     <input
                       type="number"
                       min={1}

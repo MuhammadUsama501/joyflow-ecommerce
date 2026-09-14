@@ -28,10 +28,6 @@ export function SiteHeader() {
             Admin
           </Link>
         </nav>
-        <nav className="mr-3 flex items-center gap-3 text-xs font-semibold md:hidden">
-          <Link to="/catalog" className={navLink}>Catalog</Link>
-          <Link to={session ? "/admin" : "/auth"} className={navLink}>Admin</Link>
-        </nav>
         <Link
           to="/cart"
           className="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold shadow-card transition-colors hover:border-brand/40"

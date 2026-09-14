@@ -194,7 +194,7 @@ function Index() {
             (04) — Plate &amp; Ledger POS · perpetual
           </p>
           <div className="mt-5 overflow-hidden rounded-[20px] border border-line bg-surface shadow-panel">
-            <div className="grid grid-cols-1 gap-px bg-line sm:grid-cols-3">
+            <div className="grid grid-cols-3 gap-px bg-line">
               <div className="bg-surface p-5">
                 <p className="font-mono text-[10px] uppercase tracking-wider text-subtle">Single</p>
                 <div className="mt-2 text-2xl font-bold tabular-nums">$490</div>

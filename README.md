@@ -1,16 +1,14 @@
-# Shopify Suite
-
-can you make a website of ecommerce with the all the products edit for the erp system  can make a sell on the  with payment interegration also add a policy page with non refound or return a payment also make  a backend portal that can add a product and also chenge the pricing of the change all the things from admin portal and also make a proper website with component base with add a paypal on it on the backend
+# Welcome to your Lovable project
 
 This project was built with [Lovable](https://lovable.dev).
 
 ## Build with Lovable
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/c1034fbd-13e1-4610-af84-9b2c3dcca603).
+Open your project in the [Lovable editor](https://lovable.dev) and keep building.
 
 - **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
+- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
 
 ## Development
 
@@ -22,3 +20,10 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Built with
+
+- TanStack Start
+- TypeScript
+- React
+- Tailwind CSS
