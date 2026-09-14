@@ -348,7 +348,7 @@ function ProductRow({
         </button>
         <button
           onClick={() => onDelete(product.id)}
-          className="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-clay"
+          className="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-brand"
         >
           Delete
         </button>
