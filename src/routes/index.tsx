@@ -13,7 +13,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Perpetual ERP, POS and restaurant management licenses. Instant activation keys, PayPal checkout, no shipping.",
+          "Perpetual ERP, POS and restaurant management licenses. Software licenses, secure PayRam checkout, no shipping.",
       },
       { property: "og:title", content: "Ledgerline — ERP, POS & Restaurant Software Licenses" },
       {
@@ -85,7 +85,7 @@ function Index() {
           <div className="animate-rise lg:col-span-7">
             <div className="relative h-full rounded-[24px] border border-line bg-surface p-7 shadow-panel">
               <span className="absolute right-5 top-5 rounded-full bg-sage/10 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-sage">
-                In stock · instant key
+                In stock · digital license
               </span>
               <div className="flex items-baseline justify-between">
                 <div>
@@ -178,7 +178,7 @@ function Index() {
               to="/cart"
               className="mt-4 block w-full rounded-xl bg-paypal px-4 py-3 text-center text-sm font-semibold text-paypal-foreground transition-transform hover:-translate-y-0.5"
             >
-              PayPal Checkout
+              Secure Checkout
             </Link>
             <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-wider text-subtle">
               Digital delivery · no shipping

@@ -15,6 +15,17 @@ dist-ssr
 .tanstack/**
 .nitro
 *.local
+.env
+.env.*
+!.env.example
+server/.env
+server/data/*.tmp
+server/data/.transaction.json
+server/data/.server.lock
+server/data/carts.json
+server/data/orders.json
+server/data/payments.json
+server/data/payment-events.json
 
 # Wrangler / Cloudflare
 .wrangler/
@@ -30,3 +41,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+server/test-results/
+server/playwright-report/

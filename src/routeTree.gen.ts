@@ -14,10 +14,15 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CartRouteImport } from './routes/cart'
 import { Route as CatalogRouteImport } from './routes/catalog'
+import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as PolicyRouteImport } from './routes/policy'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as PaymentFailedPaymentIdRouteImport } from './routes/payment-failed.$paymentId'
+import { Route as PaymentProcessingPaymentIdRouteImport } from './routes/payment-processing.$paymentId'
+import { Route as ProductsIndexRouteImport } from './routes/products.index'
 import { Route as ProductsSlugRouteImport } from './routes/products.$slug'
+import { Route as OrdersOrderIdSuccessRouteImport } from './routes/orders.$orderId.success'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -43,6 +48,11 @@ const CatalogRoute = CatalogRouteImport.update({
   path: '/catalog',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CheckoutRoute = CheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PolicyRoute = PolicyRouteImport.update({
   id: '/policy',
   path: '/policy',
@@ -58,9 +68,30 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const PaymentFailedPaymentIdRoute = PaymentFailedPaymentIdRouteImport.update({
+  id: '/payment-failed/$paymentId',
+  path: '/payment-failed/$paymentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentProcessingPaymentIdRoute =
+  PaymentProcessingPaymentIdRouteImport.update({
+    id: '/payment-processing/$paymentId',
+    path: '/payment-processing/$paymentId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ProductsIndexRoute = ProductsIndexRouteImport.update({
+  id: '/products/',
+  path: '/products/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductsSlugRoute = ProductsSlugRouteImport.update({
   id: '/products/$slug',
   path: '/products/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrdersOrderIdSuccessRoute = OrdersOrderIdSuccessRouteImport.update({
+  id: '/orders/$orderId/success',
+  path: '/orders/$orderId/success',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -69,20 +100,30 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/cart': typeof CartRoute
   '/catalog': typeof CatalogRoute
+  '/checkout': typeof CheckoutRoute
   '/policy': typeof PolicyRoute
   '/pricing': typeof PricingRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/payment-failed/$paymentId': typeof PaymentFailedPaymentIdRoute
+  '/payment-processing/$paymentId': typeof PaymentProcessingPaymentIdRoute
   '/products/$slug': typeof ProductsSlugRoute
+  '/products/': typeof ProductsIndexRoute
+  '/orders/$orderId/success': typeof OrdersOrderIdSuccessRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/cart': typeof CartRoute
   '/catalog': typeof CatalogRoute
+  '/checkout': typeof CheckoutRoute
   '/policy': typeof PolicyRoute
   '/pricing': typeof PricingRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/payment-failed/$paymentId': typeof PaymentFailedPaymentIdRoute
+  '/payment-processing/$paymentId': typeof PaymentProcessingPaymentIdRoute
   '/products/$slug': typeof ProductsSlugRoute
+  '/products': typeof ProductsIndexRoute
+  '/orders/$orderId/success': typeof OrdersOrderIdSuccessRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -91,10 +132,15 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/cart': typeof CartRoute
   '/catalog': typeof CatalogRoute
+  '/checkout': typeof CheckoutRoute
   '/policy': typeof PolicyRoute
   '/pricing': typeof PricingRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/payment-failed/$paymentId': typeof PaymentFailedPaymentIdRoute
+  '/payment-processing/$paymentId': typeof PaymentProcessingPaymentIdRoute
   '/products/$slug': typeof ProductsSlugRoute
+  '/products/': typeof ProductsIndexRoute
+  '/orders/$orderId/success': typeof OrdersOrderIdSuccessRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -103,20 +149,30 @@ export interface FileRouteTypes {
     | '/auth'
     | '/cart'
     | '/catalog'
+    | '/checkout'
     | '/policy'
     | '/pricing'
     | '/admin'
+    | '/payment-failed/$paymentId'
+    | '/payment-processing/$paymentId'
     | '/products/$slug'
+    | '/products/'
+    | '/orders/$orderId/success'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
     | '/cart'
     | '/catalog'
+    | '/checkout'
     | '/policy'
     | '/pricing'
     | '/admin'
+    | '/payment-failed/$paymentId'
+    | '/payment-processing/$paymentId'
     | '/products/$slug'
+    | '/products'
+    | '/orders/$orderId/success'
   id:
     | '__root__'
     | '/'
@@ -124,10 +180,15 @@ export interface FileRouteTypes {
     | '/auth'
     | '/cart'
     | '/catalog'
+    | '/checkout'
     | '/policy'
     | '/pricing'
     | '/_authenticated/admin'
+    | '/payment-failed/$paymentId'
+    | '/payment-processing/$paymentId'
     | '/products/$slug'
+    | '/products/'
+    | '/orders/$orderId/success'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -136,9 +197,14 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CartRoute: typeof CartRoute
   CatalogRoute: typeof CatalogRoute
+  CheckoutRoute: typeof CheckoutRoute
   PolicyRoute: typeof PolicyRoute
   PricingRoute: typeof PricingRoute
+  PaymentFailedPaymentIdRoute: typeof PaymentFailedPaymentIdRoute
+  PaymentProcessingPaymentIdRoute: typeof PaymentProcessingPaymentIdRoute
   ProductsSlugRoute: typeof ProductsSlugRoute
+  ProductsIndexRoute: typeof ProductsIndexRoute
+  OrdersOrderIdSuccessRoute: typeof OrdersOrderIdSuccessRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -178,6 +244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CatalogRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/checkout': {
+      id: '/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/policy': {
       id: '/policy'
       path: '/policy'
@@ -199,11 +272,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/payment-failed/$paymentId': {
+      id: '/payment-failed/$paymentId'
+      path: '/payment-failed/$paymentId'
+      fullPath: '/payment-failed/$paymentId'
+      preLoaderRoute: typeof PaymentFailedPaymentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment-processing/$paymentId': {
+      id: '/payment-processing/$paymentId'
+      path: '/payment-processing/$paymentId'
+      fullPath: '/payment-processing/$paymentId'
+      preLoaderRoute: typeof PaymentProcessingPaymentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/products/': {
+      id: '/products/'
+      path: '/products'
+      fullPath: '/products/'
+      preLoaderRoute: typeof ProductsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/products/$slug': {
       id: '/products/$slug'
       path: '/products/$slug'
       fullPath: '/products/$slug'
       preLoaderRoute: typeof ProductsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/orders/$orderId/success': {
+      id: '/orders/$orderId/success'
+      path: '/orders/$orderId/success'
+      fullPath: '/orders/$orderId/success'
+      preLoaderRoute: typeof OrdersOrderIdSuccessRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -226,9 +327,14 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CartRoute: CartRoute,
   CatalogRoute: CatalogRoute,
+  CheckoutRoute: CheckoutRoute,
   PolicyRoute: PolicyRoute,
   PricingRoute: PricingRoute,
+  PaymentFailedPaymentIdRoute: PaymentFailedPaymentIdRoute,
+  PaymentProcessingPaymentIdRoute: PaymentProcessingPaymentIdRoute,
   ProductsSlugRoute: ProductsSlugRoute,
+  ProductsIndexRoute: ProductsIndexRoute,
+  OrdersOrderIdSuccessRoute: OrdersOrderIdSuccessRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

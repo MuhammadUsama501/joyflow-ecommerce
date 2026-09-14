@@ -1,0 +1,85 @@
+[
+  {
+    "id": "ledgerline-erp",
+    "slug": "ledgerline-erp",
+    "name": "Ledgerline ERP",
+    "sku": "LL-ERP-PERP",
+    "category": "ERP",
+    "description": "Back office suite for inventory, purchasing and multi-location accounting. A perpetual license for one company.",
+    "features": [
+      "Inventory & stock control",
+      "Purchasing & supplier ledger",
+      "Accounting (GL) integration",
+      "Multi-location sync",
+      "Perpetual license",
+      "Email support"
+    ],
+    "currency": "USD",
+    "is_featured": true,
+    "sort_order": 10,
+    "price": 490,
+    "isActive": true
+  },
+  {
+    "id": "ledgerline-pos",
+    "slug": "ledgerline-pos",
+    "name": "Ledgerline POS",
+    "sku": "LL-POS-PERP",
+    "category": "POS",
+    "description": "Fast point of sale for front counters, kitchen display and table maps. A perpetual license per terminal.",
+    "features": [
+      "Point of sale terminal",
+      "Kitchen display (KDS)",
+      "Table map & floor plan",
+      "Offline-safe queue",
+      "Perpetual license",
+      "Email support"
+    ],
+    "currency": "USD",
+    "is_featured": false,
+    "sort_order": 20,
+    "price": 240,
+    "isActive": true
+  },
+  {
+    "id": "ledgerline-rms",
+    "slug": "ledgerline-rms",
+    "name": "Ledgerline Restaurant",
+    "sku": "LL-RMS-PERP",
+    "category": "RMS",
+    "description": "Restaurant management for back office, staff and shift reporting tied to your ERP. A perpetual license per location.",
+    "features": [
+      "Staff & shift management",
+      "Menu & modifiers",
+      "Daily sales reports",
+      "Tables, delivery & takeout",
+      "Perpetual license",
+      "Email support"
+    ],
+    "currency": "USD",
+    "is_featured": false,
+    "sort_order": 30,
+    "price": 390,
+    "isActive": true
+  },
+  {
+    "id": "ledgerline-suite",
+    "slug": "ledgerline-suite",
+    "name": "Ledgerline Suite",
+    "sku": "LL-SUITE-PERP",
+    "category": "Bundle",
+    "description": "ERP, POS and Restaurant combined in one perpetual license with a shared back office and a discounted bundle price.",
+    "features": [
+      "Everything in ERP, POS & RMS",
+      "Shared catalog & pricing",
+      "Full multi-location suite",
+      "Priority support",
+      "Perpetual license"
+    ],
+    "currency": "USD",
+    "is_featured": false,
+    "sort_order": 40,
+    "price": 1240,
+    "isActive": true
+  }
+]

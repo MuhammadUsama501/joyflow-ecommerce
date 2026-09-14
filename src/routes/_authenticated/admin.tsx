@@ -1,210 +1,178 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { allProductsQuery, type Product } from "@/lib/queries";
-import { formatPrice } from "@/lib/money";
-import { isAdminSession, clearAdminSession } from "@/lib/admin-auth";
+
+import { allProductsQuery, upsertProduct, removeProduct, type Product } from "@/lib/queries";
+import {
+  getOrders,
+  resetOrders,
+  getPaypalCredentials,
+  savePaypalCredentials,
+  getMetamaskCredentials,
+  saveMetamaskCredentials,
+  type Order,
+  type PaypalCreds,
+  type MetamaskCreds,
+} from "@/lib/local-store";
 import {
   getPlanConfig,
   savePlanConfig,
   resetPlanConfig,
   type PricingConfig,
 } from "@/lib/pricing-config";
+import { isAdminSession, clearAdminSession } from "@/lib/admin-auth";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  head: () => ({
-    meta: [
-      { title: "Admin portal — Ledgerline" },
-      { name: "description", content: "Manage Ledgerline products, pricing and orders." },
-      { property: "og:title", content: "Admin portal — Ledgerline" },
-      { property: "og:description", content: "Manage Ledgerline products, pricing and orders." },
-    ],
-  }),
   component: AdminPage,
 });
 
-const input =
-  "w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm outline-none focus:border-brand/50";
-const label = "block font-mono text-[10px] uppercase tracking-wider text-subtle";
 const card = "rounded-[24px] border border-line bg-surface p-6 shadow-panel";
-
-type Draft = {
-  name: string;
-  slug: string;
-  sku: string;
-  category: string;
-  description: string;
-  features: string;
-  price: string;
-};
-
-const emptyDraft: Draft = {
-  name: "",
-  slug: "",
-  sku: "",
-  category: "ERP",
-  description: "",
-  features: "",
-  price: "",
-};
 
 function AdminPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(isAdminSession());
-  const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [busy, setBusy] = useState(false);
-  const [planConfig, setPlanConfig] = useState<PricingConfig>(getPlanConfig);
+  const [draft, setDraft] = useState({
+    name: "",
+    slug: "",
+    sku: "",
+    category: "ERP",
+    description: "",
+    features: "",
+    price: "",
+  });
+  const [paypalDraft, setPaypalDraft] = useState({
+    clientId: "",
+    secret: "",
+    env: "sandbox" as "sandbox" | "live",
+  });
+  const [metaDraft, setMetaDraft] = useState({ walletAddress: "", chainId: "0x1", rpcUrl: "" });
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const products = useQuery({ ...allProductsQuery, enabled: isAdmin === true });
-  const orders = useQuery({
-    queryKey: ["orders"],
-    enabled: isAdmin === true,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
-      if (error) throw new Error(error.message);
-      return data ?? [];
-    },
-  });
+  const products = useQuery(allProductsQuery);
+  const orders = getOrders();
+  const planConfig = getPlanConfig();
 
-  const refresh = () => {
-    void qc.invalidateQueries({ queryKey: ["products"] });
-    void qc.invalidateQueries({ queryKey: ["orders"] });
-  };
+  useEffect(() => {
+    const paypal = getPaypalCredentials();
+    if (paypal) {
+      setPaypalDraft({ clientId: paypal.clientId, secret: paypal.clientSecret, env: paypal.env });
+    }
+    const meta = getMetamaskCredentials();
+    if (meta) {
+      setMetaDraft({
+        walletAddress: meta.walletAddress,
+        chainId: meta.chainId,
+        rpcUrl: meta.rpcUrl,
+      });
+    }
+  }, []);
 
-  async function signOut() {
-    await qc.cancelQueries();
-    qc.clear();
-    clearAdminSession();
+  if (!isAdminSession()) {
     void navigate({ to: "/auth", replace: true });
+    return null;
+  }
+
+  function clearDraft() {
+    setDraft({
+      name: "",
+      slug: "",
+      sku: "",
+      category: "ERP",
+      description: "",
+      features: "",
+      price: "",
+    });
   }
 
   async function addProduct(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    try {
-      const priceCents = Math.round(Number(draft.price) * 100);
-      if (!Number.isFinite(priceCents) || priceCents < 0) throw new Error("Enter a valid price.");
-      const { error } = await supabase.from("products").insert({
-        name: draft.name,
-        slug: draft.slug.trim().toLowerCase(),
-        sku: draft.sku.trim().toUpperCase(),
-        category: draft.category,
-        description: draft.description,
-        features: draft.features
-          .split("\n")
-          .map((f) => f.trim())
-          .filter(Boolean),
-        price_cents: priceCents,
-      });
-      if (error) throw new Error(error.message);
-      setDraft(emptyDraft);
-      toast.success("Product added.");
-      refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not add product.");
-    } finally {
+    const priceCents = Math.round(Number(draft.price) * 100);
+    if (!Number.isFinite(priceCents) || priceCents < 0) {
+      toast.error("Enter a valid price.");
       setBusy(false);
+      return;
     }
-  }
-
-  async function patch(id: string, values: Partial<Product>) {
-    const { error } = await supabase.from("products").update(values).eq("id", id);
-    if (error) toast.error(error.message);
-    else refresh();
-  }
-
-  async function removeProduct(id: string) {
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Product deleted.");
-      refresh();
-    }
-  }
-
-  function savePlan(updated: PricingConfig) {
-    setPlanConfig(updated);
-    savePlanConfig(updated);
-    toast.success("Plan pricing saved.");
-  }
-
-  function resetPlan() {
-    resetPlanConfig();
-    setPlanConfig(getPlanConfig());
-    toast.success("Plan pricing reset to defaults.");
-  }
-
-  function exportPlan() {
-    const blob = new Blob([JSON.stringify(getPlanConfig(), null, 2)], {
-      type: "application/json",
+    upsertProduct({
+      id: `local_${crypto.randomUUID().slice(0, 8)}`,
+      slug: draft.slug.trim().toLowerCase() || draft.name.trim().toLowerCase().replace(/\s+/g, "-"),
+      sku: draft.sku.trim().toUpperCase(),
+      category: draft.category,
+      name: draft.name,
+      description: draft.description,
+      features: draft.features
+        .split("\n")
+        .map((f) => f.trim())
+        .filter(Boolean),
+      price_cents: priceCents,
+      currency: "USD",
+      sort_order: 999,
+      is_active: true,
+      is_featured: false,
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "pricing-config.json";
-    a.click();
-    URL.revokeObjectURL(url);
+    toast.success("Product added.");
+    void qc.invalidateQueries({ queryKey: ["products"] });
+    clearDraft();
+    setBusy(false);
   }
 
-  function importPlan(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const parsed = JSON.parse(String(reader.result)) as PricingConfig;
-        if (!parsed.terminals || !parsed.locations || !parsed.support) {
-          throw new Error("Invalid config file.");
-        }
-        savePlan(parsed);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Could not import config.");
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
+  function patch(id: string, values: Partial<Product>) {
+    upsertProduct({ ...products.data!.find((p) => p.id === id)!, ...values });
+    void qc.invalidateQueries({ queryKey: ["products"] });
   }
 
-  if (isAdmin === null) {
-    return <main className="mx-auto max-w-3xl px-6 py-24 text-subtle">Checking access…</main>;
+  function remove(id: string) {
+    removeProduct(id);
+    void qc.invalidateQueries({ queryKey: ["products"] });
   }
 
-  if (!isAdmin) {
-    return (
-      <main className="mx-auto max-w-2xl px-6 py-24">
-        <div className={card}>
-          <h1 className="text-2xl font-bold tracking-tight">Admin access required</h1>
-          <p className="mt-3 text-subtle">
-            This account is not an administrator. Ask an existing administrator to grant you access.
-          </p>
-          <button onClick={signOut} className="mt-6 font-semibold text-brand">
-            Sign out
-          </button>
-        </div>
-      </main>
-    );
+  function savePaypal(e: React.FormEvent) {
+    e.preventDefault();
+    savePaypalCredentials({
+      clientId: paypalDraft.clientId.trim(),
+      clientSecret: paypalDraft.secret.trim(),
+      env: paypalDraft.env,
+    });
+    toast.success("PayPal credentials saved.");
+  }
+
+  function saveMeta(e: React.FormEvent) {
+    e.preventDefault();
+    saveMetamaskCredentials({
+      walletAddress: metaDraft.walletAddress.trim(),
+      chainId: metaDraft.chainId.trim() || "0x1",
+      rpcUrl: metaDraft.rpcUrl.trim(),
+    });
+    toast.success("MetaMask wallet saved.");
+  }
+
+  function signOut() {
+    clearAdminSession();
+    void navigate({ to: "/", replace: true });
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-12">
+    <main className="mx-auto max-w-6xl px-6 py-12">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-brand">
-            (07) — Admin portal
+            (07) — Admin
           </p>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight">Products &amp; pricing</h1>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight">
+            Products, pricing &amp; payments
+          </h1>
+          <p className="mt-3 text-sm text-subtle">
+            These are legacy browser-only settings. PayRam products and orders use server/data JSON
+            files; PayRam credentials belong in server/.env. Changes here do not configure PayRam
+            checkout.
+          </p>
         </div>
         <button
           onClick={signOut}
-          className="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold"
+          className="rounded-xl border border-line px-4 py-2 text-sm font-semibold"
         >
           Sign out
         </button>
@@ -214,64 +182,77 @@ function AdminPage() {
         <h2 className="text-lg font-bold tracking-tight">Add a product</h2>
         <form onSubmit={addProduct} className="mt-5 grid gap-4 md:grid-cols-2">
           <div>
-            <label className={label}>Name</label>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+              Name
+            </label>
             <input
               required
-              className={`${input} mt-1.5`}
+              className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
             />
           </div>
           <div>
-            <label className={label}>Slug</label>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+              Slug
+            </label>
             <input
-              required
-              className={`${input} mt-1.5`}
+              className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
               value={draft.slug}
               onChange={(e) => setDraft({ ...draft, slug: e.target.value })}
+              placeholder="auto"
             />
           </div>
           <div>
-            <label className={label}>SKU</label>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+              SKU
+            </label>
             <input
-              required
-              className={`${input} mt-1.5`}
+              className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
               value={draft.sku}
               onChange={(e) => setDraft({ ...draft, sku: e.target.value })}
             />
           </div>
           <div>
-            <label className={label}>Category</label>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+              Category
+            </label>
             <input
-              className={`${input} mt-1.5`}
+              className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
               value={draft.category}
               onChange={(e) => setDraft({ ...draft, category: e.target.value })}
             />
           </div>
           <div>
-            <label className={label}>Price (USD)</label>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+              Price (USD)
+            </label>
             <input
               required
               inputMode="decimal"
-              className={`${input} mt-1.5`}
+              className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
               value={draft.price}
               onChange={(e) => setDraft({ ...draft, price: e.target.value })}
             />
           </div>
           <div className="md:col-span-2">
-            <label className={label}>Description</label>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+              Description
+            </label>
             <textarea
               rows={2}
-              className={`${input} mt-1.5`}
+              className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
               value={draft.description}
               onChange={(e) => setDraft({ ...draft, description: e.target.value })}
             />
           </div>
           <div className="md:col-span-2">
-            <label className={label}>Features (one per line)</label>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+              Features (one per line)
+            </label>
             <textarea
               rows={3}
-              className={`${input} mt-1.5`}
+              className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
               value={draft.features}
               onChange={(e) => setDraft({ ...draft, features: e.target.value })}
             />
@@ -280,7 +261,7 @@ function AdminPage() {
             <button
               type="submit"
               disabled={busy}
-              className="rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-brand-foreground shadow-brand disabled:opacity-60"
+              className="rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-brand-foreground"
             >
               {busy ? "Saving…" : "Add product"}
             </button>
@@ -292,27 +273,121 @@ function AdminPage() {
         <h2 className="text-lg font-bold tracking-tight">Catalog</h2>
         <div className="mt-4 grid gap-4">
           {(products.data ?? []).map((p) => (
-            <ProductRow key={p.id} product={p} onPatch={patch} onDelete={removeProduct} />
+            <ProductRow key={p.id} product={p} onPatch={patch} onDelete={remove} />
           ))}
-          {products.isLoading && <p className="text-subtle">Loading products…</p>}
         </div>
       </section>
 
-      <section className="mt-12">
-        <h2 className="text-lg font-bold tracking-tight">Plan pricing</h2>
-        <PlanPricingSection
-          config={planConfig}
-          onSave={savePlan}
-          onReset={resetPlan}
-          onExport={exportPlan}
-          onImport={() => fileRef.current?.click()}
-          fileRef={fileRef}
-          onFileChange={importPlan}
-        />
+      <section className="mt-10">
+        <h2 className="text-lg font-bold tracking-tight">PayPal credentials</h2>
+        <form onSubmit={savePaypal} className={`${card} mt-4 grid gap-4 md:grid-cols-3`}>
+          <div>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+              Client ID
+            </label>
+            <input
+              required
+              className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
+              value={paypalDraft.clientId}
+              onChange={(e) => setPaypalDraft({ ...paypalDraft, clientId: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+              Client secret
+            </label>
+            <input
+              required
+              type="password"
+              className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
+              value={paypalDraft.secret}
+              onChange={(e) => setPaypalDraft({ ...paypalDraft, secret: e.target.value })}
+            />
+          </div>
+          <div className="flex flex-col justify-end">
+            <select
+              className="rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
+              value={paypalDraft.env}
+              onChange={(e) =>
+                setPaypalDraft({ ...paypalDraft, env: e.target.value as "sandbox" | "live" })
+              }
+            >
+              <option value="sandbox">Sandbox</option>
+              <option value="live">Live</option>
+            </select>
+          </div>
+          <div className="md:col-span-3">
+            <button
+              type="submit"
+              className="rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-brand-foreground"
+            >
+              Save PayPal credentials
+            </button>
+            <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-subtle">
+              Stored in this browser only. Falls back to PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET /
+              PAYPAL_ENV environment variables when empty.
+            </p>
+          </div>
+        </form>
       </section>
 
-      <section className="mt-12">
-        <h2 className="text-lg font-bold tracking-tight">Recent orders</h2>
+      <section className="mt-10">
+        <h2 className="text-lg font-bold tracking-tight">MetaMask wallet (payments)</h2>
+        <form onSubmit={saveMeta} className={`${card} mt-4 grid gap-4 md:grid-cols-3`}>
+          <div>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+              Wallet address
+            </label>
+            <input
+              required
+              placeholder="0x…"
+              className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-mono"
+              value={metaDraft.walletAddress}
+              onChange={(e) => setMetaDraft({ ...metaDraft, walletAddress: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+              Chain ID
+            </label>
+            <input
+              required
+              placeholder="0x1"
+              className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-mono"
+              value={metaDraft.chainId}
+              onChange={(e) => setMetaDraft({ ...metaDraft, chainId: e.target.value })}
+            />
+          </div>
+          <div className="flex flex-col justify-end">
+            <button
+              type="submit"
+              className="rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-brand-foreground"
+            >
+              Save wallet
+            </button>
+          </div>
+          <div className="md:col-span-3">
+            <p className="font-mono text-[10px] uppercase tracking-wider text-subtle">
+              Customers pay directly to this wallet from their MetaMask. Stored in this browser;
+              falls back to METAMASK_WALLET_ADDRESS / METAMASK_CHAIN_ID env vars.
+            </p>
+          </div>
+        </form>
+      </section>
+
+      <section className="mt-10">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold tracking-tight">Recent orders</h2>
+          <button
+            onClick={() => {
+              resetOrders();
+              window.location.reload();
+            }}
+            className="rounded-xl border border-line px-4 py-2 text-sm font-semibold text-brand"
+          >
+            Reset orders
+          </button>
+        </div>
         <div className={`${card} mt-4 overflow-x-auto`}>
           <table className="w-full text-left text-sm">
             <thead className="font-mono text-[10px] uppercase tracking-wider text-subtle">
@@ -325,21 +400,36 @@ function AdminPage() {
               </tr>
             </thead>
             <tbody>
-              {(orders.data ?? []).map((o) => (
+              {orders.map((o) => (
                 <tr key={o.id} className="border-t border-line">
                   <td className="py-3">{new Date(o.created_at).toLocaleDateString()}</td>
-                  <td className="py-3">{o.email ?? "—"}</td>
-                  <td className="py-3">{formatPrice(o.amount_cents, o.currency)}</td>
+                  <td className="py-3">{o.email}</td>
+                  <td className="py-3">
+                    {((o.amount_cents ?? 0) / 100).toFixed(2)} {o.currency}
+                  </td>
                   <td className="py-3">{o.status}</td>
-                  <td className="py-3 font-mono text-xs">{o.license_key ?? "—"}</td>
+                  <td className="py-3 font-mono text-xs">{o.license_key}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {(orders.data ?? []).length === 0 && !orders.isLoading && (
-            <p className="text-subtle">No orders yet.</p>
-          )}
+          {orders.length === 0 && <p className="text-subtle">No orders yet.</p>}
         </div>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-lg font-bold tracking-tight">Plan pricing</h2>
+        <PlanPricingSection
+          config={planConfig}
+          onSave={(c) => {
+            savePlanConfig(c);
+            toast.success("Plan pricing saved.");
+          }}
+          onReset={() => {
+            resetPlanConfig();
+            toast.success("Plan pricing reset.");
+          }}
+        />
       </section>
     </main>
   );
@@ -358,20 +448,24 @@ function ProductRow({
   const [name, setName] = useState(product.name);
 
   return (
-    <div className={`${card} grid gap-4 md:grid-cols-[2fr_1fr_auto] md:items-end`}>
+    <div className="grid items-end gap-4 rounded-[24px] border border-line bg-surface p-5 md:grid-cols-[1fr_1fr_auto]">
       <div>
-        <label className={label}>Name — {product.sku}</label>
+        <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+          Name ({product.sku})
+        </label>
         <input
-          className={`${input} mt-1.5`}
+          className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
       </div>
       <div>
-        <label className={label}>Price (USD)</label>
+        <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+          Price (USD)
+        </label>
         <input
-          className={`${input} mt-1.5`}
           inputMode="decimal"
+          className="mt-1.5 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
         />
@@ -412,18 +506,10 @@ function PlanPricingSection({
   config,
   onSave,
   onReset,
-  onExport,
-  onImport,
-  fileRef,
-  onFileChange,
 }: {
   config: PricingConfig;
   onSave: (config: PricingConfig) => void;
   onReset: () => void;
-  onExport: () => void;
-  onImport: () => void;
-  fileRef: React.RefObject<HTMLInputElement | null>;
-  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
   const [draft, setDraft] = useState<PricingConfig>(config);
 
@@ -441,17 +527,17 @@ function PlanPricingSection({
 
   function optionRows(group: "terminals" | "locations" | "support") {
     return draft[group].map((opt) => (
-      <div key={opt.id} className="grid gap-2 sm:grid-cols-[1fr_140px]">
+      <div key={opt.id} className="flex items-center gap-2">
         <input
-          className={`${input} mt-0`}
+          className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm"
           value={opt.label}
           onChange={(e) => updateOption(group, opt.id, "label", e.target.value)}
         />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center w-32">
           <span className="font-mono text-[10px] text-subtle">$</span>
           <input
-            className={`${input} mt-0`}
             inputMode="decimal"
+            className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm"
             value={(opt.price_cents / 100).toFixed(2)}
             onChange={(e) =>
               updateOption(group, opt.id, "price_cents", Math.round(Number(e.target.value) * 100))
@@ -464,14 +550,6 @@ function PlanPricingSection({
 
   return (
     <div className={`${card} mt-4`}>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="application/json"
-        className="hidden"
-        onChange={onFileChange}
-      />
-
       <div className="grid gap-8 lg:grid-cols-3">
         <div>
           <h3 className="font-mono text-[11px] uppercase tracking-wider text-subtle">Terminals</h3>
@@ -486,52 +564,30 @@ function PlanPricingSection({
           <div className="mt-3 space-y-2">{optionRows("support")}</div>
         </div>
       </div>
-
       <div className="mt-6 flex flex-wrap items-end gap-6 border-t border-line pt-5">
         <div>
-          <label className={label}>Bundle discount (%)</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-subtle">
+            Bundle discount (%)
+          </label>
           <input
-            className={`${input} mt-1.5 w-28`}
             inputMode="decimal"
+            className="mt-1.5 w-28 rounded-xl border border-line bg-paper px-3 py-2 text-sm"
             value={draft.bundleDiscountPercent}
-            onChange={(e) =>
-              setDraft({
-                ...draft,
-                bundleDiscountPercent: Number(e.target.value),
-              })
-            }
+            onChange={(e) => setDraft({ ...draft, bundleDiscountPercent: Number(e.target.value) })}
           />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => onSave(draft)}
-            className="rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-foreground"
-          >
-            Save changes
-          </button>
-          <button
-            onClick={onExport}
-            className="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold"
-          >
-            Export config
-          </button>
-          <button
-            onClick={onImport}
-            className="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold"
-          >
-            Import config
-          </button>
-          <button
-            onClick={onReset}
-            className="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-brand"
-          >
-            Reset to defaults
-          </button>
-        </div>
-        <p className="w-full font-mono text-[10px] uppercase tracking-wider text-subtle">
-          Changes apply to the pricing page in this browser. Use Export/Import to move config across
-          devices.
-        </p>
+        <button
+          onClick={() => onSave(draft)}
+          className="rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-foreground"
+        >
+          Save changes
+        </button>
+        <button
+          onClick={onReset}
+          className="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-brand"
+        >
+          Reset to defaults
+        </button>
       </div>
     </div>
   );

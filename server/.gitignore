@@ -1,0 +1,3 @@
+# PM2 runtime logs for the JoyFlow API (created by ecosystem.config.cjs).
+server/pm2-logs/
+*.log

@@ -6,6 +6,7 @@ import { productsQuery, type Product } from "@/lib/queries";
 import { formatPrice } from "@/lib/money";
 import { useCart } from "@/lib/cart";
 import { getPlanConfig, type PlanSelection } from "@/lib/pricing-config";
+import { api } from "@/services/api";
 import { calculatePlanPrice } from "@/lib/pricing";
 
 export const Route = createFileRoute("/pricing")({
@@ -60,21 +61,29 @@ function PricingPage() {
     });
   }
 
-  function addToCart() {
+  async function addToCart() {
     if (selection.productSlugs.length === 0) {
       toast.error("Select at least one product.");
       return;
     }
-    const names = selection.productSlugs
-      .map((slug) => products.find((p) => p.slug === slug)?.name)
-      .filter(Boolean);
-    const label = names.length === 1 ? names[0] : `Custom Plan — ${names.join(" + ")}`;
-    add({
-      slug: `custom-plan-${Date.now()}`,
-      name: label ?? "Custom Plan",
-      priceCents: result.total,
-    });
-    toast.success("Custom plan added to cart!");
+    try {
+      const quote = await api<{ slug: string; name: string; price: number }>("/api/plan-quotes", {
+        method: "POST",
+        body: JSON.stringify(selection),
+      });
+      const names = selection.productSlugs
+        .map((slug) => products.find((p) => p.slug === slug)?.name)
+        .filter(Boolean);
+      const label = names.length === 1 ? names[0] : `Custom Plan — ${names.join(" + ")}`;
+      add({
+        slug: quote.slug,
+        name: quote.name,
+        priceCents: Math.round(quote.price * 100),
+      });
+      toast.success("Custom plan added to cart!");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not quote your plan.");
+    }
   }
 
   return (

@@ -83,7 +83,7 @@ function ProductDetail() {
               }}
               className="mt-3 w-full rounded-xl border border-line bg-paper px-4 py-3 text-sm font-semibold transition-colors hover:border-brand/40"
             >
-              Buy now with PayPal
+              Continue to checkout
             </button>
             <p className="mt-4 font-mono text-[10px] uppercase tracking-wider text-subtle">
               Digital delivery · all sales final

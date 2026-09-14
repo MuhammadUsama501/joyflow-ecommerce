@@ -83,7 +83,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Buy ERP, POS and restaurant management software licenses. Instant digital delivery, PayPal checkout.",
+          "Buy ERP, POS and restaurant management software licenses. Digital software licenses, secure PayRam checkout.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

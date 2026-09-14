@@ -1,3 +1,4 @@
+import { AddToCartButton } from "./AddToCartButton";
 import { Link } from "@tanstack/react-router";
 import { formatPrice } from "@/lib/money";
 import type { Product } from "@/lib/queries";
@@ -25,6 +26,7 @@ export function ProductCard({ product }: { product: Product }) {
           Details →
         </Link>
       </div>
+      <AddToCartButton product={product} />
     </article>
   );
 }
